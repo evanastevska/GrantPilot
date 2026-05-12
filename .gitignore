@@ -1,0 +1,12 @@
+service_account.json
+.env
+
+# Python
+__pycache__/
+*.pyc
+*.pyo
+.venv/
+venv/
+
+# Local dev
+.DS_Store
