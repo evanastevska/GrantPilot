@@ -19,6 +19,7 @@
 
   <textarea id="grant-input" placeholder="Paste grant opportunity here..."></textarea>
   <input type="email" id="email" placeholder="Your Google email address">
+  <input type="password" id="password" placeholder="Password">
   <button onclick="startAgent()">Generate Grant Draft</button>
 
   <div id="log">Progress will appear here...</div>
@@ -39,9 +40,18 @@
       const formData = new FormData();
       formData.append('grant_input', grantInput);
       formData.append('email', email);
+      formData.append('password', document.getElementById('password').value);
 
       fetch('/run', { method: 'POST', body: formData })
-        .then(() => {
+        .then(response => {
+            if (response.status === 401) {
+            log.innerHTML = '<p style="color:red">Incorrect password.</p>';
+            return;
+            }
+            if (response.status === 400) {
+            log.innerHTML = '<p style="color:red">Please fill in all fields.</p>';
+            return;
+            }
           const source = new EventSource('/stream');
 
           source.onmessage = (event) => {

@@ -10,3 +10,6 @@ venv/
 
 # Local dev
 .DS_Store
+
+token.json
+oauth_credentials.json

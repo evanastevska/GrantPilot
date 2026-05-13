@@ -1,10 +1,15 @@
+import os
 import queue
 import threading
 from flask import Flask, request, Response, stream_with_context, render_template
 from agent import run_agent
+from dotenv import load_dotenv
+
+load_dotenv()
 
 app = Flask(__name__)
 progress_queue = queue.Queue()
+APP_PASSWORD = os.environ.get('APP_PASSWORD')
 
 
 @app.route('/')
@@ -14,8 +19,15 @@ def index():
 
 @app.route('/run', methods=['POST'])
 def run():
+    #check password first
+    if request.form.get('password') != APP_PASSWORD:
+        return {'status': 'error', 'message': 'Incorrect password.'}, 401
+
     grant_input = request.form.get('grant_input', '')
     email = request.form.get('email', '')
+
+    if not grant_input or not email:
+        return {'status': 'error', 'message': 'Missing grant input or email.'}, 400
 
     while not progress_queue.empty():
         try:

@@ -183,12 +183,23 @@ def run_agent(grant_input: str, recipient_email: str, q: queue.Queue):
             candidate = response.candidates[0]
 
             if candidate.content is None:
-                #model was blocked or returned empty, check finish reason
                 finish_reason = candidate.finish_reason
+
+                if str(finish_reason) == 'MALFORMED_FUNCTION_CALL':
+                    #tell the model what happened and ask it to continue
+                    q.put("Retrying last step...")
+                    conversation_history.append(
+                        types.Content(
+                            role="user",
+                            parts=[types.Part(text="Your last response was malformed. Please check which sections have been written so far and continue writing any remaining sections, keeping each section concise.")]
+                        )
+                    )
+                    continue  #goes back to top of while loop
+
                 q.put(f"ERROR: Model returned no content. Finish reason: {finish_reason}")
                 return
 
-            # temporary debug — print raw response text
+            #temporary debug, print raw response text
             try:
                 for part in response.candidates[0].content.parts:
                     print("PART TYPE:", type(part))
