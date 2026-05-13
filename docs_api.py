@@ -14,11 +14,16 @@ FOLDER_ID = os.environ.get('GOOGLE_DRIVE_FOLDER_ID')
 
 
 def get_services():
-    """Build and return authenticated Docs and Drive service clients."""
+    import os
+    print("Looking for service account at:", os.path.abspath('service_account.json'))
+    print("File exists:", os.path.exists('service_account.json'))
+
     creds = service_account.Credentials.from_service_account_file(
         'service_account.json',
         scopes=SCOPES,
     )
+    print("Service account email:", creds.service_account_email)
+
     docs_service = build('docs', 'v1', credentials=creds)
     drive_service = build('drive', 'v3', credentials=creds)
     return docs_service, drive_service
@@ -32,12 +37,20 @@ def create_and_share_doc(title: str, sections: dict, issues: list, recipient_ema
     docs_service, drive_service = get_services()
 
     #create an empty Google Doc
-    doc = docs_service.documents().create(body={'title': title}).execute()
-    doc_id = doc['documentId']
+    file_metadata = {
+        'name': title,
+        'mimeType': 'application/vnd.google-apps.document',
+        'parents': [FOLDER_ID]
+    }
+    doc_file = drive_service.files().create(
+        body=file_metadata,
+        fields='id'
+    ).execute()
+    doc_id = doc_file['id']
 
     #build the content to insert:
     #Google Docs API writes content as a list of "requests"
-    #Each request is an operation: insert text, format it, etc.
+    #each request is an operation: insert text, format it, etc.
     #build the full list first, then send it in one API call
 
     requests = []

@@ -5,6 +5,8 @@ from google import genai
 from google.genai import types
 from tools import read_url
 from docs_api import create_and_share_doc
+from tools import read_url, search_web
+import traceback
 
 load_dotenv()
 client = genai.Client(api_key=os.environ['GEMINI_API_KEY'])
@@ -38,17 +40,20 @@ Your job is to research the grant opportunity the user provides and write a comp
 compelling grant application tailored specifically to this funder.
 
 Follow this process:
-1. Use Google Search and read_url to research the funder thoroughly —
-   their priorities, past grantees, funding amounts, deadlines, and eligibility.
-2. Flag any issues using flag_issue — for example if the funder only gives to
-   organizations in a specific state, or has a focus that doesn't match Cinema Verde.
-3. Write each section using write_section, in order. Tailor every section to what
+1. Use search_web to research the funder — their priorities, past grantees, funding
+   amounts, deadlines, and eligibility requirements. Search multiple times if needed.
+2. Use read_url to read specific pages you find — grant guidelines, about pages,
+   past grantee lists. Always read cinemaverde.org as well.
+3. Flag any eligibility issues using flag_issue — geographic restrictions, budget
+   requirements, focus areas that don't match Cinema Verde.
+4. Write each section using write_section, in order. Tailor every section to what
    you learned about this specific funder. Do not write generic grant boilerplate.
-4. The Notes for Reviewer section should list specific things the human needs to
+5. The Notes for Reviewer section should list specific things the human needs to
    verify, add, or customize — dollar amounts, statistics, contact names, etc.
-5. When all sections are written, call finish.
+6. When all sections are written, call finish.
 
-Be thorough in your research before writing.
+Be thorough in your research before writing. Search first, read the relevant pages,
+then write.
 """
 
 #tool declarations: tells gemini what is is and its parameters
@@ -65,6 +70,21 @@ read_url_declaration = types.FunctionDeclaration(
             )
         },
         required=["url"]
+    )
+)
+
+search_web_declaration = types.FunctionDeclaration(
+    name="search_web",
+    description="Search the web for information about a funder, grant program, or any research needed to write the grant. Use this first before read_url to find relevant URLs and background information.",
+    parameters=types.Schema(
+        type=types.Type.OBJECT,
+        properties={
+            "query": types.Schema(
+                type=types.Type.STRING,
+                description="The search query. Be specific — include the funder name, grant program name, and what you're looking for."
+            )
+        },
+        required=["query"]
     )
 )
 
@@ -112,15 +132,13 @@ finish_declaration = types.FunctionDeclaration(
 )
 
 custom_tools = types.Tool(function_declarations=[
+    search_web_declaration,
     read_url_declaration,
     write_section_declaration,
     flag_issue_declaration,
     finish_declaration,
 ])
 
-google_search_tool = types.Tool(
-    google_search=types.GoogleSearch()
-)
 
 
 #main agent function
@@ -132,13 +150,8 @@ def run_agent(grant_input: str, recipient_email: str, q: queue.Queue):
     try:
         config = types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,
-            tools=[custom_tools, google_search_tool],
-            tool_config=types.ToolConfig(
-                function_calling_config=types.FunctionCallingConfig(
-                    mode="AUTO",
-                ),
-                include_server_side_tool_invocations=True,
-            )
+            tools=[custom_tools],
+            max_output_tokens=8192,
         )
 
         conversation_history = [
@@ -158,7 +171,7 @@ def run_agent(grant_input: str, recipient_email: str, q: queue.Queue):
             iteration += 1
 
             response = client.models.generate_content(
-                model="gemini-3-flash-preview",
+                model="gemini-2.5-flash",
                 contents=conversation_history,
                 config=config,
             )
@@ -167,8 +180,24 @@ def run_agent(grant_input: str, recipient_email: str, q: queue.Queue):
             conversation_history.append(response.candidates[0].content)
 
             #collect tool calls from response
+            candidate = response.candidates[0]
+
+            if candidate.content is None:
+                #model was blocked or returned empty, check finish reason
+                finish_reason = candidate.finish_reason
+                q.put(f"ERROR: Model returned no content. Finish reason: {finish_reason}")
+                return
+
+            # temporary debug — print raw response text
+            try:
+                for part in response.candidates[0].content.parts:
+                    print("PART TYPE:", type(part))
+                    print("PART:", part)
+            except Exception as debug_err:
+                print("DEBUG ERROR:", debug_err)
+
             tool_calls = [
-                part for part in response.candidates[0].content.parts
+                part for part in candidate.content.parts
                 if part.function_call is not None
             ]
 
@@ -185,10 +214,31 @@ def run_agent(grant_input: str, recipient_email: str, q: queue.Queue):
                 name = fn.name
                 args = dict(fn.args)
 
-                if name == "read_url":
+                if name == "search_web":
+                    query = args["query"]
+                    q.put(f"Searching: {query}")
+                    result = search_web(query)
+                    # trim to prevent context bloat
+                    words = result.split()
+                    if len(words) > 300:
+                        result = ' '.join(words[:300]) + '\n[truncated]'
+                    tool_results.append(
+                        types.Part(
+                            function_response=types.FunctionResponse(
+                                name=name,
+                                response={"result": result}
+                            )
+                        )
+                    )
+
+                elif name == "read_url":
                     url = args["url"]
                     q.put(f"Reading: {url}")
                     result = read_url(url)
+                    #already truncated to 3000 words in tools.py, reduce further
+                    words = result.split()
+                    if len(words) > 1000:
+                        result = ' '.join(words[:1000]) + '\n[truncated]'
                     tool_results.append(
                         types.Part(
                             function_response=types.FunctionResponse(
@@ -248,4 +298,6 @@ def run_agent(grant_input: str, recipient_email: str, q: queue.Queue):
             q.put("ERROR: Agent hit maximum iterations without finishing.")
 
     except Exception as e:
+        error_details = traceback.format_exc()
+        print(error_details)  #prints full traceback to terminal
         q.put(f"ERROR: {str(e)}")
