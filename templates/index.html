@@ -1,0 +1,71 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cinema Verde — Grant Writing Agent</title>
+  <style>
+    body { font-family: sans-serif; max-width: 700px; margin: 40px auto; padding: 0 20px; }
+    textarea { width: 100%; height: 200px; margin-bottom: 12px; padding: 10px; font-size: 14px; }
+    input[type=email] { width: 100%; padding: 10px; font-size: 14px; margin-bottom: 12px; }
+    button { padding: 12px 24px; font-size: 16px; cursor: pointer; }
+    #log { margin-top: 24px; padding: 16px; background: #f5f5f5; min-height: 80px;
+           font-family: monospace; font-size: 13px; line-height: 1.6; }
+  </style>
+</head>
+<body>
+  <h1>Cinema Verde Grant Writing Agent</h1>
+  <p>Paste a grant opportunity below — a URL, a description, or the full application text.</p>
+
+  <textarea id="grant-input" placeholder="Paste grant opportunity here..."></textarea>
+  <input type="email" id="email" placeholder="Your Google email address">
+  <button onclick="startAgent()">Generate Grant Draft</button>
+
+  <div id="log">Progress will appear here...</div>
+
+  <script>
+    function startAgent() {
+      const grantInput = document.getElementById('grant-input').value;
+      const email = document.getElementById('email').value;
+      const log = document.getElementById('log');
+
+      if (!grantInput || !email) {
+        log.textContent = 'Please fill in both fields.';
+        return;
+      }
+
+      log.innerHTML = '<p>Starting agent...</p>';
+
+      const formData = new FormData();
+      formData.append('grant_input', grantInput);
+      formData.append('email', email);
+
+      fetch('/run', { method: 'POST', body: formData })
+        .then(() => {
+          const source = new EventSource('/stream');
+
+          source.onmessage = (event) => {
+            const msg = event.data;
+
+            if (msg.startsWith('DONE:')) {
+              const url = msg.replace('DONE:', '');
+              log.innerHTML += `<p><strong>Done!</strong> <a href="${url}" target="_blank">Open your grant draft →</a></p>`;
+              source.close();
+            } else if (msg.startsWith('ERROR:')) {
+              log.innerHTML += `<p style="color:red">${msg}</p>`;
+              source.close();
+            } else {
+              log.innerHTML += `<p>${msg}</p>`;
+              log.scrollTop = log.scrollHeight;
+            }
+          };
+
+          source.onerror = () => {
+            log.innerHTML += '<p style="color:red">Connection error.</p>';
+            source.close();
+          };
+        });
+    }
+  </script>
+</body>
+</html>
