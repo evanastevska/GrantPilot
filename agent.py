@@ -1,5 +1,6 @@
 import os
 import queue
+import time
 from dotenv import load_dotenv
 from google import genai
 from google.genai import types
@@ -48,6 +49,7 @@ Follow this process:
    requirements, focus areas that don't match Cinema Verde.
 4. Write each section using write_section, in order. Tailor every section to what
    you learned about this specific funder. Do not write generic grant boilerplate.
+   Keep each section focused and concise — 200 to 300 words maximum.
 5. The Notes for Reviewer section should list specific things the human needs to
    verify, add, or customize — dollar amounts, statistics, contact names, etc.
 6. When all sections are written, call finish.
@@ -56,7 +58,7 @@ Be thorough in your research before writing. Search first, read the relevant pag
 then write.
 """
 
-#tool declarations: tells gemini what is is and its parameters
+#tool declarations: what is is and parameters
 
 read_url_declaration = types.FunctionDeclaration(
     name="read_url",
@@ -90,7 +92,11 @@ search_web_declaration = types.FunctionDeclaration(
 
 write_section_declaration = types.FunctionDeclaration(
     name="write_section",
-    description="Write a section of the grant application. Call this once per section after you have enough information.",
+    description=(
+        "Write a section of the grant application. Call this once per section after "
+        "you have enough information. Keep each section concise: 200–300 words maximum. "
+        "Do not pad or repeat information across sections."
+    ),
     parameters=types.Schema(
         type=types.Type.OBJECT,
         properties={
@@ -100,7 +106,10 @@ write_section_declaration = types.FunctionDeclaration(
             ),
             "content": types.Schema(
                 type=types.Type.STRING,
-                description="Full text content of this grant section, written professionally and tailored to this funder."
+                description=(
+                    "The section content, written professionally and tailored to this funder. "
+                    "Maximum 300 words. Be specific and compelling, not generic."
+                )
             )
         },
         required=["section_name", "content"]
@@ -140,18 +149,84 @@ custom_tools = types.Tool(function_declarations=[
 ])
 
 
+def _is_research_turn(content: types.Content) -> bool:
+    """Return True if this history entry is a search/read_url tool call or its result.
+
+    We identify these by checking model turns that only contain search_web or
+    read_url function calls, and user turns that only contain function_response
+    parts for those same tools. Written sections and flag_issue results are
+    kept because they're compact and contextually useful.
+    """
+    if content.parts is None:
+        return False
+
+    RESEARCH_TOOLS = {"search_web", "read_url"}
+
+    #model turn: all parts are function_calls for research tools
+    if content.role == "model":
+        calls = [p for p in content.parts if p.function_call is not None]
+        non_calls = [p for p in content.parts if p.function_call is None and (p.text or "") != ""]
+        if calls and not non_calls:
+            return all(p.function_call.name in RESEARCH_TOOLS for p in calls)
+
+    #user turn: all parts are function_responses for research tools
+    if content.role == "user":
+        responses = [p for p in content.parts if p.function_response is not None]
+        non_responses = [p for p in content.parts if p.function_response is None and (p.text or "") != ""]
+        if responses and not non_responses:
+            return all(p.function_response.name in RESEARCH_TOOLS for p in responses)
+
+    return False
+
+
+def _prune_history(history: list, sections: dict) -> list:
+    """Drop research turns (search/read_url pairs) from history.
+
+    Called once writing begins. The first entry (the original user prompt)
+    is always kept. A compact research summary is injected so the model
+    retains awareness of what was found without the full token cost.
+    """
+    #always keep index 0 (the original user prompt)
+    pruned = [history[0]]
+
+    #one line summary of what sections have been written so far
+    written = list(sections.keys())
+    remaining = [s for s in GRANT_SECTIONS if s not in written]
+
+    summary_lines = ["[Research phase complete. Raw search and URL results have been summarised to save context.]"]
+    if written:
+        summary_lines.append(f"Sections already written: {', '.join(written)}.")
+    if remaining:
+        summary_lines.append(f"Sections still to write: {', '.join(remaining)}.")
+    summary_lines.append("Continue writing the remaining sections using write_section, then call finish.")
+
+    pruned.append(
+        types.Content(
+            role="user",
+            parts=[types.Part(text="\n".join(summary_lines))]
+        )
+    )
+
+    #keep non-research turns (write_section calls, flag_issue calls, their results, and any nudge messages)
+    for entry in history[1:]:
+        if not _is_research_turn(entry):
+            pruned.append(entry)
+
+    return pruned
+
 
 #main agent function
 
 def run_agent(grant_input: str, recipient_email: str, q: queue.Queue):
     sections = {}
     issues = []
+    history_pruned = False  # only prune once
 
     try:
         config = types.GenerateContentConfig(
             system_instruction=SYSTEM_PROMPT,
             tools=[custom_tools],
-            max_output_tokens=8192,
+            max_output_tokens=16384,
         )
 
         conversation_history = [
@@ -166,67 +241,96 @@ def run_agent(grant_input: str, recipient_email: str, q: queue.Queue):
         MAX_ITERATIONS = 30
         iteration = 0
 
-        #langchain would replace this
         while iteration < MAX_ITERATIONS:
             iteration += 1
 
-            response = client.models.generate_content(
-                model="gemini-2.5-flash",
-                contents=conversation_history,
-                config=config,
-            )
+            #retrying on 503 (server overload) up to 3 times
+            for attempt in range(3):
+                try:
+                    response = client.models.generate_content(
+                        model="gemini-2.5-flash",
+                        contents=conversation_history,
+                        config=config,
+                    )
+                    break  #success
+                except Exception as api_err:
+                    if '503' in str(api_err) and attempt < 2:
+                        wait = 15 * (attempt + 1)  # 15s, then 30s
+                        q.put(f"Model busy (503), retrying in {wait}s...")
+                        time.sleep(wait)
+                    else:
+                        raise  #not a 503, or out of retries, let outer handler catch it
 
             #add model response to history
             conversation_history.append(response.candidates[0].content)
 
-            #collect tool calls from response
             candidate = response.candidates[0]
 
             if candidate.content is None:
                 finish_reason = candidate.finish_reason
 
-                if str(finish_reason) == 'MALFORMED_FUNCTION_CALL':
-                    #tell the model what happened and ask it to continue
-                    q.put("Retrying last step...")
-                    conversation_history.append(
-                        types.Content(
-                            role="user",
-                            parts=[types.Part(text="Your last response was malformed. Please check which sections have been written so far and continue writing any remaining sections, keeping each section concise.")]
+                if str(finish_reason) == 'FinishReason.MALFORMED_FUNCTION_CALL' or 'MALFORMED_FUNCTION_CALL' in str(finish_reason):
+                    q.put("Retrying last step (malformed response)...")
+
+                    #prune history before retrying
+                    if not history_pruned:
+                        q.put("Pruning research history to free up context...")
+                        conversation_history = _prune_history(conversation_history, sections)
+                        history_pruned = True
+                    else:
+                        #already pruned, just add a targeted nudge
+                        written = list(sections.keys())
+                        remaining = [s for s in GRANT_SECTIONS if s not in written]
+                        nudge = (
+                            f"Sections written so far: {', '.join(written) if written else 'none'}. "
+                            f"Please write the next section: '{remaining[0] if remaining else 'all done — call finish'}'. "
+                            "Keep it under 300 words and call write_section now."
                         )
-                    )
-                    continue  #goes back to top of while loop
+                        conversation_history.append(
+                            types.Content(
+                                role="user",
+                                parts=[types.Part(text=nudge)]
+                            )
+                        )
+                    continue
 
                 q.put(f"ERROR: Model returned no content. Finish reason: {finish_reason}")
                 return
-
-            #temporary debug, print raw response text
-            try:
-                for part in response.candidates[0].content.parts:
-                    print("PART TYPE:", type(part))
-                    print("PART:", part)
-            except Exception as debug_err:
-                print("DEBUG ERROR:", debug_err)
 
             tool_calls = [
                 part for part in candidate.content.parts
                 if part.function_call is not None
             ]
 
+            #prune history the first time we see a write_section call before the history has a chance to grow further
+            if not history_pruned:
+                for part in tool_calls:
+                    if part.function_call.name == "write_section":
+                        q.put("Research complete — pruning history before writing sections...")
+                        conversation_history = _prune_history(conversation_history, sections)
+                        history_pruned = True
+                        break
+
             if not tool_calls:
-                #check if there's a text response
                 text_parts = [
                     part.text for part in candidate.content.parts
                     if part.text is not None
                 ]
 
                 if text_parts:
-                    #model gave a text response instead of a tool call
-                    #nudge it back to using tools
                     q.put("Retrying...")
+                    written = list(sections.keys())
+                    remaining = [s for s in GRANT_SECTIONS if s not in written]
+                    nudge = (
+                        "Please continue by calling the appropriate tools. "
+                        f"Sections written: {', '.join(written) if written else 'none'}. "
+                        f"Next section to write: '{remaining[0] if remaining else 'all done — call finish'}'. "
+                        "Use write_section now, keeping content under 300 words."
+                    )
                     conversation_history.append(
                         types.Content(
                             role="user",
-                            parts=[types.Part(text="Please continue by calling the appropriate tools. Use write_section to write any remaining sections, then call finish when all sections are complete.")]
+                            parts=[types.Part(text=nudge)]
                         )
                     )
                     continue
@@ -246,7 +350,6 @@ def run_agent(grant_input: str, recipient_email: str, q: queue.Queue):
                     query = args["query"]
                     q.put(f"Searching: {query}")
                     result = search_web(query)
-                    # trim to prevent context bloat
                     words = result.split()
                     if len(words) > 300:
                         result = ' '.join(words[:300]) + '\n[truncated]'
@@ -263,7 +366,6 @@ def run_agent(grant_input: str, recipient_email: str, q: queue.Queue):
                     url = args["url"]
                     q.put(f"Reading: {url}")
                     result = read_url(url)
-                    #already truncated to 3000 words in tools.py, reduce further
                     words = result.split()
                     if len(words) > 1000:
                         result = ' '.join(words[:1000]) + '\n[truncated]'
@@ -314,7 +416,6 @@ def run_agent(grant_input: str, recipient_email: str, q: queue.Queue):
                         )
                         q.put(f"DONE:{doc_url}")
                     except Exception as doc_error:
-                        import traceback
                         full_error = traceback.format_exc()
                         print(full_error, flush=True)
                         q.put(f"ERROR: {repr(doc_error)}")
