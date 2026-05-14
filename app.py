@@ -19,6 +19,9 @@ def index():
 
 @app.route('/run', methods=['POST'])
 def run():
+    print(f"APP_PASSWORD value: '{APP_PASSWORD}'")
+    print(f"Submitted password: '{request.form.get('password')}'")
+
     #check password first
     if request.form.get('password') != APP_PASSWORD:
         return {'status': 'error', 'message': 'Incorrect password.'}, 401

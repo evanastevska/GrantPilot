@@ -213,9 +213,26 @@ def run_agent(grant_input: str, recipient_email: str, q: queue.Queue):
             ]
 
             if not tool_calls:
-                #model responded with text, so either done or confused
-                q.put("Agent finished reasoning.")
-                break
+                #check if there's a text response
+                text_parts = [
+                    part.text for part in candidate.content.parts
+                    if part.text is not None
+                ]
+
+                if text_parts:
+                    #model gave a text response instead of a tool call
+                    #nudge it back to using tools
+                    q.put("Retrying...")
+                    conversation_history.append(
+                        types.Content(
+                            role="user",
+                            parts=[types.Part(text="Please continue by calling the appropriate tools. Use write_section to write any remaining sections, then call finish when all sections are complete.")]
+                        )
+                    )
+                    continue
+                else:
+                    q.put("Agent finished reasoning.")
+                    break
 
             #execute each tool call and collect results
             tool_results = []
@@ -288,13 +305,19 @@ def run_agent(grant_input: str, recipient_email: str, q: queue.Queue):
 
                 elif name == "finish":
                     q.put("All sections written. Creating Google Doc...")
-                    doc_url = create_and_share_doc(
-                        title="Grant Application — Cinema Verde",
-                        sections=sections,
-                        issues=issues,
-                        recipient_email=recipient_email,
-                    )
-                    q.put(f"DONE:{doc_url}")
+                    try:
+                        doc_url = create_and_share_doc(
+                            title="Grant Application — Cinema Verde",
+                            sections=sections,
+                            issues=issues,
+                            recipient_email=recipient_email,
+                        )
+                        q.put(f"DONE:{doc_url}")
+                    except Exception as doc_error:
+                        import traceback
+                        full_error = traceback.format_exc()
+                        print(full_error, flush=True)
+                        q.put(f"ERROR: {repr(doc_error)}")
                     return
 
             #feed all tool results back to the model
@@ -309,6 +332,6 @@ def run_agent(grant_input: str, recipient_email: str, q: queue.Queue):
             q.put("ERROR: Agent hit maximum iterations without finishing.")
 
     except Exception as e:
-        error_details = traceback.format_exc()
-        print(error_details)  #prints full traceback to terminal
-        q.put(f"ERROR: {str(e)}")
+        full_error = traceback.format_exc()
+        print(full_error, flush=True)
+        q.put(f"ERROR: {repr(e)}")
