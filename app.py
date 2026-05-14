@@ -26,11 +26,15 @@ def run():
     if request.form.get('password') != APP_PASSWORD:
         return {'status': 'error', 'message': 'Incorrect password.'}, 401
 
-    grant_input = request.form.get('grant_input', '')
-    email = request.form.get('email', '')
+    grant_url   = request.form.get('grant_url', '').strip()
+    grant_input = request.form.get('grant_input', '').strip()
+    email       = request.form.get('email', '').strip()
 
-    if not grant_input or not email:
-        return {'status': 'error', 'message': 'Missing grant input or email.'}, 400
+    #at least one of URL or description is required, plus email
+    if not grant_url and not grant_input:
+        return {'status': 'error', 'message': 'Please provide a grant URL or description.'}, 400
+    if not email:
+        return {'status': 'error', 'message': 'Missing email address.'}, 400
 
     while not progress_queue.empty():
         try:
@@ -40,7 +44,7 @@ def run():
 
     thread = threading.Thread(
         target=run_agent,
-        args=(grant_input, email, progress_queue),
+        args=(grant_input, email, progress_queue, grant_url),
         daemon=True,
     )
     thread.start()

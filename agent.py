@@ -58,7 +58,7 @@ Be thorough in your research before writing. Search first, read the relevant pag
 then write.
 """
 
-#tool declarations: what is is and parameters
+#tool declarations: what is it and parameters
 
 read_url_declaration = types.FunctionDeclaration(
     name="read_url",
@@ -217,7 +217,7 @@ def _prune_history(history: list, sections: dict) -> list:
 
 #main agent function
 
-def run_agent(grant_input: str, recipient_email: str, q: queue.Queue):
+def run_agent(grant_input: str, recipient_email: str, q: queue.Queue, grant_url: str = ""):
     sections = {}
     issues = []
     history_pruned = False  # only prune once
@@ -229,10 +229,33 @@ def run_agent(grant_input: str, recipient_email: str, q: queue.Queue):
             max_output_tokens=16384,
         )
 
+        #build the opening user message. if URL was provided, fetch it
+        opening_parts = []
+
+        if grant_url:
+            q.put(f"Reading grant URL: {grant_url}")
+            url_content = read_url(grant_url)
+            opening_parts.append(
+                f"I have pre-fetched the grant guidelines from {grant_url}:\n\n"
+                f"{url_content}\n\n"
+                f"---"
+            )
+
+        if grant_input:
+            opening_parts.append(
+                f"Additional context provided by the user:\n\n{grant_input}"
+            )
+
+        if not opening_parts:
+            opening_parts.append("No grant details provided.")
+
+        opening_text = "\n\n".join(opening_parts)
+        opening_text = "Here is the grant opportunity to research and write for:\n\n" + opening_text
+
         conversation_history = [
             types.Content(
                 role="user",
-                parts=[types.Part(text=f"Here is the grant opportunity to research and write for:\n\n{grant_input}")]
+                parts=[types.Part(text=opening_text)]
             )
         ]
 

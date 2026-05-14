@@ -6,8 +6,14 @@
   <title>Cinema Verde — Grant Writing Agent</title>
   <style>
     body { font-family: sans-serif; max-width: 700px; margin: 40px auto; padding: 0 20px; }
-    textarea { width: 100%; height: 200px; margin-bottom: 12px; padding: 10px; font-size: 14px; }
-    input[type=email] { width: 100%; padding: 10px; font-size: 14px; margin-bottom: 12px; }
+    label { display: block; font-size: 14px; font-weight: bold; margin-bottom: 4px; }
+    .hint { font-size: 13px; color: #666; margin-bottom: 8px; }
+    input[type=url], input[type=email], input[type=password] {
+      width: 100%; padding: 10px; font-size: 14px; margin-bottom: 16px;
+      box-sizing: border-box;
+    }
+    textarea { width: 100%; height: 160px; margin-bottom: 16px; padding: 10px;
+               font-size: 14px; box-sizing: border-box; }
     button { padding: 12px 24px; font-size: 16px; cursor: pointer; }
     #log { margin-top: 24px; padding: 16px; background: #f5f5f5; min-height: 80px;
            font-family: monospace; font-size: 13px; line-height: 1.6; }
@@ -15,43 +21,60 @@
 </head>
 <body>
   <h1>Cinema Verde Grant Writing Agent</h1>
-  <p>Paste a grant opportunity below — a URL, a description, or the full application text.</p>
 
-  <textarea id="grant-input" placeholder="Paste grant opportunity here..."></textarea>
-  <input type="email" id="email" placeholder="Your Google email address">
+  <label for="grant-url">Grant guidelines URL <span style="font-weight:normal">(optional)</span></label>
+  <p class="hint">If the funder has a page with grant guidelines, paste the URL here. The agent will read it directly.</p>
+  <input type="url" id="grant-url" placeholder="https://example.org/grants/guidelines">
+
+  <label for="grant-input">Grant description / additional context</label>
+  <p class="hint">Paste any additional information — a program description, eligibility notes, or anything else relevant to this opportunity.</p>
+  <textarea id="grant-input" placeholder="Paste grant description or notes here..."></textarea>
+
+  <label for="email">Your Google email address</label>
+  <input type="email" id="email" placeholder="you@example.com">
+
+  <label for="password">Password</label>
   <input type="password" id="password" placeholder="Password">
+
   <button onclick="startAgent()">Generate Grant Draft</button>
 
   <div id="log">Progress will appear here...</div>
 
   <script>
     function startAgent() {
-      const grantInput = document.getElementById('grant-input').value;
-      const email = document.getElementById('email').value;
-      const log = document.getElementById('log');
+      const grantUrl   = document.getElementById('grant-url').value.trim();
+      const grantInput = document.getElementById('grant-input').value.trim();
+      const email      = document.getElementById('email').value.trim();
+      const log        = document.getElementById('log');
 
-      if (!grantInput || !email) {
-        log.textContent = 'Please fill in both fields.';
+      if (!grantInput && !grantUrl) {
+        log.innerHTML = '<p style="color:red">Please provide at least a URL or a description.</p>';
+        return;
+      }
+      if (!email) {
+        log.innerHTML = '<p style="color:red">Please enter your Google email address.</p>';
         return;
       }
 
       log.innerHTML = '<p>Starting agent...</p>';
 
       const formData = new FormData();
+      formData.append('grant_url',   grantUrl);
       formData.append('grant_input', grantInput);
-      formData.append('email', email);
-      formData.append('password', document.getElementById('password').value);
+      formData.append('email',       email);
+      formData.append('password',    document.getElementById('password').value);
 
       fetch('/run', { method: 'POST', body: formData })
         .then(response => {
-            if (response.status === 401) {
+          if (response.status === 401) {
             log.innerHTML = '<p style="color:red">Incorrect password.</p>';
             return;
-            }
-            if (response.status === 400) {
-            log.innerHTML = '<p style="color:red">Please fill in all fields.</p>';
+          }
+          if (response.status === 400) {
+            log.innerHTML = '<p style="color:red">Please fill in the required fields.</p>';
             return;
-            }
+          }
+
           const source = new EventSource('/stream');
 
           source.onmessage = (event) => {
