@@ -3,102 +3,221 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Cinema Verde — Grant Writing Agent</title>
-  <style>
-    body { font-family: sans-serif; max-width: 700px; margin: 40px auto; padding: 0 20px; }
-    label { display: block; font-size: 14px; font-weight: bold; margin-bottom: 4px; }
-    .hint { font-size: 13px; color: #666; margin-bottom: 8px; }
-    input[type=url], input[type=email], input[type=password] {
-      width: 100%; padding: 10px; font-size: 14px; margin-bottom: 16px;
-      box-sizing: border-box;
-    }
-    textarea { width: 100%; height: 160px; margin-bottom: 16px; padding: 10px;
-               font-size: 14px; box-sizing: border-box; }
-    button { padding: 12px 24px; font-size: 16px; cursor: pointer; }
-    #log { margin-top: 24px; padding: 16px; background: #f5f5f5; min-height: 80px;
-           font-family: monospace; font-size: 13px; line-height: 1.6; }
-  </style>
+  <title>Grant Writing Agent — Cinema Verde</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Playfair+Display:ital,wght@0,400;0,600;1,400&family=DM+Sans:ital,wght@0,300;0,400;0,500;1,300&family=DM+Mono:wght@400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
 </head>
 <body>
-  <h1>Cinema Verde Grant Writing Agent</h1>
 
-  <label for="grant-url">Grant guidelines URL <span style="font-weight:normal">(optional)</span></label>
-  <p class="hint">If the funder has a page with grant guidelines, paste the URL here. The agent will read it directly.</p>
-  <input type="url" id="grant-url" placeholder="https://example.org/grants/guidelines">
+  <div class="noise"></div>
 
-  <label for="grant-input">Grant description / additional context</label>
-  <p class="hint">Paste any additional information — a program description, eligibility notes, or anything else relevant to this opportunity.</p>
-  <textarea id="grant-input" placeholder="Paste grant description or notes here..."></textarea>
+  <div class="page-wrap">
 
-  <label for="email">Your Google email address</label>
-  <input type="email" id="email" placeholder="you@example.com">
+    <header class="site-header">
+      <a href="https://cinemaverde.org" target="_blank" class="logo-link">
+        <img
+          src="{{ url_for('static', filename='cv_logo.png') }}"
+          alt="Cinema Verde"
+          class="site-logo"
+        >
+      </a>
+      <a href="https://cinemaverde.org" target="_blank" class="nav-pill">↗ cinemaverde.org</a>
+    </header>
 
-  <label for="password">Password</label>
-  <input type="password" id="password" placeholder="Password">
+    <section class="hero">
+      <div class="hero-eyebrow">
+        <span class="eyebrow-pip"></span>
+        Internal Tool
+      </div>
+      <h1 class="hero-title">
+        Grant Writing<br><em>Agent</em>
+      </h1>
+      <p class="hero-sub">
+        AI-powered grant research and drafting for Cinema Verde's funding applications.
+        Paste an opportunity and receive a tailored draft delivered to your Google Drive.
+      </p>
+    </section>
 
-  <button onclick="startAgent()">Generate Grant Draft</button>
+    <main class="card">
+      <div class="card-glow"></div>
+      <div class="card-inner">
 
-  <div id="log">Progress will appear here...</div>
+        <div class="field-group">
+          <label class="field-label" for="grant-url">
+            Grant guidelines URL
+            <span class="field-badge">optional</span>
+          </label>
+          <div class="input-wrap">
+            <svg class="input-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+            <input type="url" id="grant-url" class="field-input" placeholder="https://funder.org/grant-guidelines" autocomplete="off">
+          </div>
+        </div>
+
+        <div class="field-group">
+          <label class="field-label" for="grant-input">
+            Opportunity details
+            <span class="field-badge field-badge--required">required</span>
+          </label>
+          <p class="field-hint">Paste the full RFP, a description, funding priorities, deadline, amount — anything relevant.</p>
+          <textarea id="grant-input" class="field-textarea" placeholder="Paste the grant opportunity here…"></textarea>
+        </div>
+
+        <div class="field-row">
+          <div class="field-group">
+            <label class="field-label" for="email">Google email</label>
+            <div class="input-wrap">
+              <svg class="input-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M4 4h16c1.1 0 2 .9 2 2v12c0 1.1-.9 2-2 2H4c-1.1 0-2-.9-2-2V6c0-1.1.9-2 2-2z"/><polyline points="22,6 12,13 2,6"/></svg>
+              <input type="email" id="email" class="field-input" placeholder="you@gmail.com" autocomplete="email">
+            </div>
+          </div>
+          <div class="field-group">
+            <label class="field-label" for="password">Password</label>
+            <div class="input-wrap">
+              <svg class="input-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+              <input type="password" id="password" class="field-input" placeholder="••••••••">
+            </div>
+          </div>
+        </div>
+
+        <div class="card-footer">
+          <button class="submit-btn" id="submit-btn" onclick="startAgent()">
+            <svg class="btn-icon" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            Generate Grant Draft
+          </button>
+          <p class="card-disclaimer">Delivered to Google Drive · typically 3–5 minutes</p>
+        </div>
+
+      </div>
+    </main>
+
+    <section class="log-panel" id="log-panel" aria-live="polite" aria-label="Agent progress">
+      <div class="log-header">
+        <span class="log-dot" id="log-dot"></span>
+        <span class="log-header-label" id="log-header-label">Agent activity</span>
+      </div>
+      <div class="log-body" id="log">
+        <p class="log-idle">Progress will appear here once the agent starts.</p>
+      </div>
+    </section>
+
+    <footer class="site-footer">
+      Cinema Verde &middot; 501(c)(3) Nonprofit &middot; Gainesville, Florida &middot;
+      <a href="https://cinemaverde.org" target="_blank">cinemaverde.org</a>
+    </footer>
+
+  </div>
 
   <script>
     function startAgent() {
       const grantUrl   = document.getElementById('grant-url').value.trim();
       const grantInput = document.getElementById('grant-input').value.trim();
       const email      = document.getElementById('email').value.trim();
+      const password   = document.getElementById('password').value;
       const log        = document.getElementById('log');
+      const btn        = document.getElementById('submit-btn');
+      const dot        = document.getElementById('log-dot');
+      const label      = document.getElementById('log-header-label');
 
-      if (!grantInput && !grantUrl) {
-        log.innerHTML = '<p style="color:red">Please provide at least a URL or a description.</p>';
-        return;
-      }
-      if (!email) {
-        log.innerHTML = '<p style="color:red">Please enter your Google email address.</p>';
-        return;
-      }
+      let combined = grantInput;
+      if (grantUrl) combined = 'Grant Guidelines URL: ' + grantUrl + '\n\n' + grantInput;
 
-      log.innerHTML = '<p>Starting agent...</p>';
+      if (!combined) { flashError('Please paste the grant opportunity details.'); return; }
+      if (!email)    { flashError('Please enter your Google email address.'); return; }
 
-      const formData = new FormData();
-      formData.append('grant_url',   grantUrl);
-      formData.append('grant_input', grantInput);
-      formData.append('email',       email);
-      formData.append('password',    document.getElementById('password').value);
+      btn.disabled = true;
+      btn.classList.add('btn--loading');
+      dot.className = 'log-dot dot--active';
+      label.textContent = 'Agent running\u2026';
+      log.innerHTML = '';
+      appendLog('Starting grant research\u2026', 'info');
 
-      fetch('/run', { method: 'POST', body: formData })
-        .then(response => {
-          if (response.status === 401) {
-            log.innerHTML = '<p style="color:red">Incorrect password.</p>';
-            return;
+      const fd = new FormData();
+      fd.append('grant_input', combined);
+      fd.append('email', email);
+      fd.append('password', password);
+
+      fetch('/run', { method: 'POST', body: fd })
+        .then(res => {
+          if (res.status === 401) {
+            resetBtn(); dot.className = 'log-dot dot--error';
+            label.textContent = 'Authentication failed';
+            log.innerHTML = ''; appendLog('Incorrect password.', 'error'); return;
           }
-          if (response.status === 400) {
-            log.innerHTML = '<p style="color:red">Please fill in the required fields.</p>';
-            return;
+          if (res.status === 400) {
+            resetBtn(); dot.className = 'log-dot dot--error';
+            label.textContent = 'Missing fields';
+            log.innerHTML = ''; appendLog('Please fill in all required fields.', 'error'); return;
           }
 
           const source = new EventSource('/stream');
 
-          source.onmessage = (event) => {
-            const msg = event.data;
-
+          source.onmessage = e => {
+            const msg = e.data;
             if (msg.startsWith('DONE:')) {
               const url = msg.replace('DONE:', '');
-              log.innerHTML += `<p><strong>Done!</strong> <a href="${url}" target="_blank">Open your grant draft →</a></p>`;
+              resetBtn();
+              dot.className = 'log-dot dot--done';
+              label.textContent = 'Draft complete';
+              appendLog(url, 'done');
               source.close();
             } else if (msg.startsWith('ERROR:')) {
-              log.innerHTML += `<p style="color:red">${msg}</p>`;
+              resetBtn();
+              dot.className = 'log-dot dot--error';
+              label.textContent = 'Error occurred';
+              appendLog(msg.replace('ERROR:', '').trim(), 'error');
               source.close();
             } else {
-              log.innerHTML += `<p>${msg}</p>`;
-              log.scrollTop = log.scrollHeight;
+              appendLog(msg, 'info');
             }
           };
 
           source.onerror = () => {
-            log.innerHTML += '<p style="color:red">Connection error.</p>';
+            resetBtn();
+            dot.className = 'log-dot dot--error';
+            label.textContent = 'Connection lost';
+            appendLog('Connection error — please refresh and try again.', 'error');
             source.close();
           };
-        });
+        })
+        .catch(err => { resetBtn(); appendLog('Network error: ' + err.message, 'error'); });
+    }
+
+    function appendLog(msg, type) {
+      const log = document.getElementById('log');
+      const idle = log.querySelector('.log-idle');
+      if (idle) idle.remove();
+
+      const p = document.createElement('p');
+      p.className = 'log-line log-line--' + type;
+
+      if (type === 'done') {
+        p.innerHTML = '<span class="log-star">\u2736</span> Grant draft ready! <a class="log-link" href="' + msg + '" target="_blank">Open in Google Docs \u2192</a>';
+      } else {
+        const icon = type === 'error' ? '\u2715' : '\u203a';
+        p.innerHTML = '<span class="log-prefix">' + icon + '</span>' + esc(msg);
+      }
+
+      log.appendChild(p);
+      log.scrollTop = log.scrollHeight;
+    }
+
+    function flashError(msg) {
+      document.getElementById('log').innerHTML = '';
+      appendLog(msg, 'error');
+    }
+
+    function resetBtn() {
+      const btn = document.getElementById('submit-btn');
+      btn.disabled = false;
+      btn.classList.remove('btn--loading');
+    }
+
+    function esc(s) {
+      return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
     }
   </script>
+
 </body>
 </html>
