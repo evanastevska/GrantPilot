@@ -1,7 +1,7 @@
 # GrantPilot
 
 An internal tool I built during my AI/ML internship at Cinema Verde, a nonprofit 
-environmental film festival in Gainesville, Florida. The team has no dedicated 
+environmental film festival in Gainesville, Florida. The team has no dedicated  
 grant writer, so I built an AI agent to help automate the process.
 
 You paste in a grant opportunity, and the agent researches the funder and writes a complete grant application tailored to them. The tool then 
