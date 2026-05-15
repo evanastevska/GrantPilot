@@ -61,7 +61,11 @@
             <span class="field-badge field-badge--required">required</span>
           </label>
           <p class="field-hint">Paste the full RFP, a description, funding priorities, deadline, amount — anything relevant.</p>
-          <textarea id="grant-input" class="field-textarea" placeholder="Paste the grant opportunity here…"></textarea>
+          <textarea id="grant-input" class="field-textarea" placeholder="Paste the grant opportunity here…" oninput="updateWordCount()"></textarea>
+          <div class="textarea-meta">
+            <button class="clear-btn" onclick="clearTextarea()" type="button">Clear</button>
+            <span class="word-count" id="word-count">0 words</span>
+          </div>
         </div>
 
         <div class="field-row">
@@ -102,6 +106,20 @@
       </div>
     </section>
 
+    <div class="success-banner" id="success-banner" hidden>
+      <div class="success-left">
+        <div class="success-icon">✦</div>
+        <div>
+          <div class="success-title">Grant draft ready</div>
+          <div class="success-sub">Shared to your Google Drive</div>
+        </div>
+      </div>
+      <a class="success-open-btn" id="success-link" href="#" target="_blank">
+        Open in Google Docs
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+      </a>
+    </div>
+
     <footer class="site-footer">
       Cinema Verde &middot; 501(c)(3) Nonprofit &middot; Gainesville, Florida &middot;
       <a href="https://cinemaverde.org" target="_blank">cinemaverde.org</a>
@@ -131,6 +149,7 @@
       dot.className = 'log-dot dot--active';
       label.textContent = 'Agent running\u2026';
       log.innerHTML = '';
+      document.getElementById('success-banner').hidden = true;
       appendLog('Starting grant research\u2026', 'info');
 
       const fd = new FormData();
@@ -160,7 +179,10 @@
               resetBtn();
               dot.className = 'log-dot dot--done';
               label.textContent = 'Draft complete';
-              appendLog(url, 'done');
+              const banner = document.getElementById('success-banner');
+              document.getElementById('success-link').href = url;
+              banner.hidden = false;
+              banner.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
               source.close();
             } else if (msg.startsWith('ERROR:')) {
               resetBtn();
@@ -212,6 +234,19 @@
       const btn = document.getElementById('submit-btn');
       btn.disabled = false;
       btn.classList.remove('btn--loading');
+    }
+
+    function updateWordCount() {
+      const ta = document.getElementById('grant-input');
+      const wc = document.getElementById('word-count');
+      const words = ta.value.trim() === '' ? 0 : ta.value.trim().split(/\s+/).length;
+      wc.textContent = words + ' words';
+      wc.classList.toggle('word-count--warn', words > 500);
+    }
+
+    function clearTextarea() {
+      document.getElementById('grant-input').value = '';
+      updateWordCount();
     }
 
     function esc(s) {

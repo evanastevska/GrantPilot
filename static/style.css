@@ -481,6 +481,109 @@ a:hover { color: #fff; }
   color: #fff;
 }
 
+.textarea-meta {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-top: 6px;
+}
+
+.clear-btn {
+  font-family: var(--font-body);
+  font-size: 0.72rem;
+  font-weight: 400;
+  color: var(--text-muted);
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  transition: color var(--transition);
+}
+.clear-btn:hover { color: var(--text-secondary); }
+
+.word-count {
+  font-family: var(--font-mono);
+  font-size: 0.7rem;
+  color: var(--text-muted);
+  transition: color var(--transition);
+}
+.word-count--warn { color: #C8A040; }
+
+.success-banner[hidden] { display: none; }
+
+.success-banner {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding: 18px 24px;
+  background: rgba(58, 138, 122, 0.08);
+  border: 0.5px solid rgba(106, 188, 172, 0.25);
+  border-radius: var(--radius-lg);
+  animation: banner-in 0.3s ease forwards;
+}
+@keyframes banner-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.success-left {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+}
+
+.success-icon {
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(58, 138, 122, 0.15);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  color: var(--teal-light);
+  flex-shrink: 0;
+}
+
+.success-title {
+  font-size: 0.95rem;
+  font-weight: 500;
+  color: #90EE90;
+  margin-bottom: 2px;
+}
+
+.success-sub {
+  font-size: 0.78rem;
+  font-weight: 300;
+  color: var(--teal-light);
+}
+
+.success-open-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 10px 20px;
+  font-family: var(--font-body);
+  font-size: 0.82rem;
+  font-weight: 500;
+  color: var(--teal-light);
+  background: rgba(106, 188, 172, 0.1);
+  border: 0.5px solid rgba(106, 188, 172, 0.3);
+  border-radius: 100px;
+  white-space: nowrap;
+  flex-shrink: 0;
+  transition: background var(--transition), color var(--transition);
+}
+.success-open-btn:hover {
+  background: rgba(106, 188, 172, 0.2);
+  color: #fff;
+}
+
 @media (max-width: 560px) {
   .page-wrap    { padding: 0 18px 60px; }
   .card-inner   { padding: 26px 22px 28px; }
