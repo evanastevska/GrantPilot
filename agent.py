@@ -285,23 +285,19 @@ def run_agent(grant_input: str, recipient_email: str, q: queue.Queue, grant_url:
                         raise  #not a 503, or out of retries, let outer handler catch it
 
             #add model response to history
-            conversation_history.append(response.candidates[0].content)
-
             candidate = response.candidates[0]
 
-            if candidate.content is None:
+            if candidate.content is None or candidate.content.parts is None:
                 finish_reason = candidate.finish_reason
 
                 if str(finish_reason) == 'FinishReason.MALFORMED_FUNCTION_CALL' or 'MALFORMED_FUNCTION_CALL' in str(finish_reason):
                     q.put("Retrying last step (malformed response)...")
 
-                    #prune history before retrying
                     if not history_pruned:
                         q.put("Pruning research history to free up context...")
                         conversation_history = _prune_history(conversation_history, sections)
                         history_pruned = True
                     else:
-                        #already pruned, just add a targeted nudge
                         written = list(sections.keys())
                         remaining = [s for s in GRANT_SECTIONS if s not in written]
                         nudge = (
@@ -320,8 +316,11 @@ def run_agent(grant_input: str, recipient_email: str, q: queue.Queue, grant_url:
                 q.put(f"ERROR: Model returned no content. Finish reason: {finish_reason}")
                 return
 
+            #anly reaches here if content is not None
+            conversation_history.append(candidate.content)
+
             tool_calls = [
-                part for part in candidate.content.parts
+                part for part in (candidate.content.parts or [])
                 if part.function_call is not None
             ]
 
